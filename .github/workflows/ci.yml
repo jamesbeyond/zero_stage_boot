@@ -36,10 +36,14 @@ jobs:
             toolchain_tripe: riscv64-unknown-linux-gnu-
           - name: linux-64ilp32
             toolchain_tripe: riscv64-unknown-elf-
+          - name: linux-5.10-64lp64
+            toolchain_tripe: riscv64-unknown-linux-gnu-
           - name: opensbi-64lp64
             toolchain_tripe: riscv64-unknown-linux-gnu-
           - name: opensbi-32ilp32
             toolchain_tripe: riscv32-unknown-linux-gnu-
+          - name: opensbi-0.9-64lp64
+            toolchain_tripe: riscv64-unknown-linux-gnu-
 
     runs-on: ubuntu-22.04
     env:
@@ -165,6 +169,20 @@ jobs:
                 cd -
                 tar czvf ${{ matrix.name }}.tar.gz Image vmlinux git.log modules_install headers_install gdbmacros.txt
               fi
+              if [ x"${{ matrix.name }}" = x"linux-5.10-64lp64" ]; then
+                export PATH="/opt/riscv/bin:$PATH"
+                git clone https://github.com/c-sky/csky-linux.git linux
+                cd linux
+                git checkout 5daa9f6723047b48a7f07c9e1c9969593e7e9829
+                echo CONFIG_STD_SVPBMT=y >> arch/riscv/configs/defconfig
+                make ARCH=riscv EXTRA_CFLAGS+=-g defconfig all INSTALL_MOD_PATH=../modules_install modules_install INSTALL_HDR_PATH=../headers_install headers_install -j$(nproc)
+                mv arch/riscv/boot/Image ../
+                mv vmlinux ../
+                cp Documentation/admin-guide/kdump/gdbmacros.txt ../
+                git log --oneline -500 > ../git.log
+                cd -
+                tar czvf ${{ matrix.name }}.tar.gz Image vmlinux git.log modules_install headers_install gdbmacros.txt
+              fi
               if [ x"${{ matrix.name }}" = x"opensbi-64lp64" ]; then
                 export PATH="/opt/riscv/bin:$PATH"
                 git clone https://github.com/riscv-software-src/opensbi.git
@@ -189,7 +207,18 @@ jobs:
                 cd -
                 tar czvf ${{ matrix.name }}.tar.gz fw_dynamic.elf fw_dynamic.bin git.log
               fi
-
+              if [ x"${{ matrix.name }}" = x"opensbi-0.9-64lp64" ]; then
+                export PATH="/opt/riscv/bin:$PATH"
+                git clone https://github.com/c-sky/opensbi.git
+                cd opensbi
+                git checkout 89182b257c8798e15e4c685c1af0c2862d528d2a
+                make PLATFORM=generic -j
+                mv build/platform/generic/firmware/fw_dynamic.bin ../
+                mv build/platform/generic/firmware/fw_dynamic.elf ../
+                git log --oneline -500 > ../git.log
+                cd -
+                tar czvf ${{ matrix.name }}.tar.gz fw_dynamic.elf fw_dynamic.bin git.log
+              fi
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v4
         with:
